@@ -612,7 +612,6 @@ fn test_git_remote_rename_updates_trunk() {
     let output = local_dir.run_jj(["log", "-r", "trunk()", "-T", "description"]);
     insta::assert_snapshot!(output, @"
     ◆  init
-    │
     ~
     [EOF]
     ");
@@ -808,7 +807,6 @@ fn test_git_remote_named_git() {
     let output = work_dir.run_jj(["log", "-rmain@git", "-Tbookmarks"]);
     insta::assert_snapshot!(output, @"
     @  main
-    │
     ~
     [EOF]
     ");
@@ -851,7 +849,6 @@ fn test_git_remote_named_git() {
     let output = work_dir.run_jj(["log", "-rmain@git", "-Tbookmarks"]);
     insta::assert_snapshot!(output, @"
     ○  main
-    │
     ~
     [EOF]
     ");
@@ -926,7 +923,6 @@ fn test_git_remote_with_slashes() {
     let output = work_dir.run_jj(["log", "-rmain@git", "-Tbookmarks"]);
     insta::assert_snapshot!(output, @"
     ○  main
-    │
     ~
     [EOF]
     ");

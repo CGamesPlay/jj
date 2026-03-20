@@ -388,7 +388,6 @@ fn test_git_colocation_enable_disable_with_pack_files() {
     let output = work_dir.run_jj(["log", "-r", "@-", "-T", "description"]);
     insta::assert_snapshot!(output, @"
     ○  first
-    │
     ~
     [EOF]
     ");

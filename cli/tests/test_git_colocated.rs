@@ -227,7 +227,8 @@ fn test_git_colocated_new_wc_commit_when_wc_immutable() {
     │  A file2
     ◆  qpvuntsm test.user@example.com 2001-02-03 08:05:08 eb7b8a1f
     │  (no description set)
-    ~  A file1
+    │  A file1
+    ~
     [EOF]
     ");
     insta::assert_snapshot!(get_colocation_status(&work_dir), @"

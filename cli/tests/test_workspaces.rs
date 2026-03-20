@@ -1776,7 +1776,8 @@ fn test_workspaces_remove_snapshots_before_removal() {
     insta::assert_snapshot!(output, @"
     ○  pmmvwywv test.user@example.com 2001-02-03 08:05:10 e7db06a0
     │  (no description set)
-    ~  A unsnapshotted.txt
+    │  A unsnapshotted.txt
+    ~
     [EOF]
     ");
 }
