@@ -26,6 +26,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * A new config option `diff.git.show-path-prefix` can be used to suppress the
   `a/` and `b/` path prefixes in the `diff --git` output.
 
+* The final `~` shown in `jj log` now respects `ui.log-synthetic-elided-nodes`
+  and uses the `log_node` template.
+
+### Bug fixes
+
+* `jj log --reversed` now correctly shows elided nodes.
+
 ## [0.40.0] - 2026-04-01
 
 ### Release highlights
