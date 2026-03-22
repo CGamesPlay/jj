@@ -35,9 +35,9 @@ fn main() {
     });
 
     if let Some(git_hash) = git_hash {
-        println!("cargo:rustc-env=JJ_VERSION={version}-{git_hash}");
+        println!("cargo:rustc-env=JJ_VERSION={version}-{git_hash} (CGamesPlay fork)");
     } else {
-        println!("cargo:rustc-env=JJ_VERSION={version}");
+        println!("cargo:rustc-env=JJ_VERSION={version} (CGamesPlay fork)");
     }
 
     let docs_symlink_path = Path::new("docs");

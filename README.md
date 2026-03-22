@@ -2,6 +2,14 @@
 
 # Jujutsu—a version control system
 
+<!-- start @CGamesPlay block -->
+
+This is a soft-fork of jj with my various enhancements and misfeatures. This repository provides prebuilt binaries for common architectures, built from the rolling "latest" release.
+
+[What's in this fork?](https://github.com/jj-vcs/jj/compare/main...CGamesPlay:jj:main) • [Download](https://github.com/CGamesPlay/jj/releases/tag/latest)
+
+<!-- end @CGamesPlay block -->
+
 <p><img title="jj logo" src="docs/images/jj-logo.svg" width="320" height="320"></p>
 
 [![Release](https://img.shields.io/github/v/release/martinvonz/jj)](https://github.com/jj-vcs/jj/releases)
