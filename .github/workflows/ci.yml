@@ -1,15 +1,12 @@
 name: ci
 
 on:
+  push:
+    branches: [main]
   pull_request:
-  merge_group:
 
 concurrency:
-  group: >-
-    ${{ github.workflow }}-${{
-      github.event.pull_request.number
-      || github.event.merge_group.head_ref
-    }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: {}
@@ -19,31 +16,11 @@ jobs:
     strategy:
       fail-fast: ${{ github.event_name == 'merge_group' }}
       matrix:
-        build: [linux-x86_64-gnu, linux-aarch64-gnu, macos-x86_64, macos-aarch64, windows-x86_64, windows-aarch64]
+        build: [linux-x86_64-gnu]
         include:
         - build: linux-x86_64-gnu
           os: ubuntu-24.04
           cargo_flags: "--all-features"
-          extra_targets: ""
-        - build: linux-aarch64-gnu
-          os: ubuntu-24.04-arm
-          cargo_flags: "--all-features"
-          extra_targets: ""
-        - build: macos-x86_64
-          os: macos-26
-          cargo_flags: "--target x86_64-apple-darwin"
-          extra_targets: "x86_64-apple-darwin"
-        - build: macos-aarch64
-          os: macos-15
-          cargo_flags: ""
-          extra_targets: ""
-        - build: windows-x86_64
-          os: windows-2022
-          cargo_flags: ""
-          extra_targets: ""
-        - build: windows-aarch64
-          os: windows-11-arm
-          cargo_flags: ""
           extra_targets: ""
     runs-on: ${{ matrix.os }}
 
@@ -109,6 +86,7 @@ jobs:
         CARGO_TERM_COLOR: always
 
   no-git:
+    if: false
     name: build (no git)
     runs-on: ubuntu-24.04
     steps:
@@ -123,6 +101,7 @@ jobs:
       run: cargo build -p jj-cli --no-default-features --verbose
 
   build-nix:
+    if: false
     name: nix flake
     strategy:
       fail-fast: ${{ github.event_name == 'merge_group' }}
@@ -140,6 +119,7 @@ jobs:
       - run: nix flake check -L --show-trace
 
   check-protos:
+    if: false
     name: check (protos)
     runs-on: ubuntu-24.04
     steps:
@@ -184,6 +164,7 @@ jobs:
       - run: cargo +stable clippy --all-features --workspace --all-targets -- -D warnings
 
   check-cargo-deny:
+    if: false
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -206,6 +187,7 @@ jobs:
         command: check ${{ matrix.checks }}
 
   check-codespell:
+    if: false
     name: check (codespell)
     runs-on: ubuntu-24.04
     steps:
@@ -225,6 +207,7 @@ jobs:
         run: uv run -- codespell && echo Codespell exited successfully
 
   check-doctests:
+    if: false
     name: check (doctests)
     runs-on: ubuntu-24.04
     steps:
@@ -247,6 +230,7 @@ jobs:
         run: cargo doc --workspace --no-deps
 
   check-mkdocs:
+    if: false
     name: check (mkdocs)
     runs-on: ubuntu-24.04
     steps:
@@ -267,6 +251,7 @@ jobs:
 
   # An optional job to alert us when uv updates break the build
   check-mkdocs-latest:
+    if: false
     name: check (latest mkdocs, optional)
     runs-on: ubuntu-24.04
     steps:
@@ -281,6 +266,7 @@ jobs:
         run: uv run --python-preference=only-managed -- mkdocs build --strict
 
   check-zizmor:
+    if: false
     name: check (zizmor)
     runs-on: ubuntu-latest
     permissions:
@@ -307,6 +293,7 @@ jobs:
 
   # Count the (very approximate) number of dependencies in Cargo.lock and bail at a certain limit.
   check-cargo-lock-bloat:
+    if: false
     name: check (Cargo.lock dependency count)
     runs-on: ubuntu-24.04
     steps:
@@ -333,8 +320,8 @@ jobs:
   # Block the merge if required checks fail, but only in the merge
   # queue. See also `required-checks-hack.yml`.
   required-checks:
+    if: false
     name: required checks (merge queue)
-    if: ${{ always() && github.event_name == 'merge_group' }}
     needs:
     - test
     - no-git

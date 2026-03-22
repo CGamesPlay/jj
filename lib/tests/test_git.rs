@@ -6063,6 +6063,28 @@ fn test_remote_rename_refs() -> TestResult {
     let commit_tag_foo_x_y = empty_git_commit(&git_repo, "refs/jj/remote-tags/foo/x/y", &[]);
     let commit_tag_foobar_a = empty_git_commit(&git_repo, "refs/jj/remote-tags/foobar/a", &[]);
 
+    // Add a branch config section with `rebase = true` referencing the remote.
+    // This is standard git config and should not prevent renaming.
+    {
+        let mut config = git_repo.config_snapshot().clone();
+        let mut section = config
+            .new_section("branch", Some(bstr::BStr::new("main").into()))
+            .expect("new section");
+        section.push("remote".try_into().unwrap(), Some(b"foo".as_ref().into()));
+        section.push(
+            "merge".try_into().unwrap(),
+            Some(b"refs/heads/main".as_ref().into()),
+        );
+        section.push("rebase".try_into().unwrap(), Some(b"true".as_ref().into()));
+        let mut out =
+            std::fs::File::create(git_repo.path().join("config")).expect("open git config");
+        config.write_to(&mut out).expect("write git config");
+    }
+    // Reload to pick up the config change.
+    let repo = &test_repo
+        .env
+        .load_repo_at_head(&testutils::user_settings(), test_repo.repo_path());
+
     let mut tx = repo.start_transaction();
     git::rename_remote(tx.repo_mut(), "foo".as_ref(), "bar".as_ref())?;
     let repo = &tx.commit("rename").block_on()?;

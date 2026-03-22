@@ -2,6 +2,27 @@
 
 # Jujutsu—a version control system
 
+<!-- start @CGamesPlay block -->
+
+This is a soft-fork of jj with my various enhancements and misfeatures.
+
+```mermaid
+---
+title: Should I use this fork of jj?
+---
+flowchart TD
+    A[Are you me?] -->|Yes| B[✅ Go ahead]
+    A -->|No| C[❌ No, use upstream]
+```
+
+### Download
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CGamesPlay/jj/main/download.sh | bash
+```
+
+<!-- end @CGamesPlay block -->
+
 <p><img title="jj logo" src="docs/images/jj-logo.svg" width="320" height="320"></p>
 
 [![Release](https://img.shields.io/github/v/release/martinvonz/jj)](https://github.com/jj-vcs/jj/releases)

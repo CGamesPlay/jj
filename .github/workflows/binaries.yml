@@ -5,42 +5,30 @@ on:
     branches:
       - main
 
-permissions: {}
+permissions:
+  contents: write
 
 jobs:
   binaries:
     strategy:
       fail-fast: false
-
       matrix:
-        build: [linux-x86_64-musl, linux-x86_64-gnu, linux-aarch64-musl, linux-aarch64-gnu, macos-x86_64, macos-aarch64, win-x86_64]
+        build: [linux-x86_64-musl, linux-aarch64-musl, macos-x86_64, macos-aarch64]
         include:
         - build: linux-x86_64-musl
           os: ubuntu-24.04
           target: x86_64-unknown-linux-musl
-        - build: linux-x86_64-gnu
-          os: ubuntu-24.04
-          target: x86_64-unknown-linux-gnu
         - build: linux-aarch64-musl
           os: ubuntu-24.04-arm
           target: aarch64-unknown-linux-musl
-        - build: linux-aarch64-gnu
-          os: ubuntu-24.04-arm
-          target: aarch64-unknown-linux-gnu
         - build: macos-x86_64
           os: macos-15
           target: x86_64-apple-darwin
         - build: macos-aarch64
           os: macos-15
           target: aarch64-apple-darwin
-        - build: win-x86_64
-          os: windows-2022
-          target: x86_64-pc-windows-msvc
-        - build: win-aarch64
-          os: windows-11-arm
-          target: aarch64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20 # NOTE (aseipp): tests aren't run but sometimes builds take a while
+    timeout-minutes: 20
 
     name: Build binary artifacts
     steps:
@@ -60,19 +48,53 @@ jobs:
       - name: Build release binary
         shell: bash
         run: cargo build --target ${{ matrix.target }} --verbose --release
-
       - name: Set up artifact directory
         shell: bash
         run: |
           outdir="target/${{ matrix.target }}/release"
-          BIN=$outdir/jj
-          [[ "${{ matrix.os }}" == windows* ]] && BIN+=".exe"
-
           mkdir -p target/out
-          cp $BIN target/out
-
+          cp $outdir/jj target/out
       - name: Publish binary artifact
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: jj-${{ matrix.target }}
           path: target/out
+
+  release:
+    needs: binaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    name: Update rolling release
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e
+        with:
+          path: artifacts
+
+      - name: Package artifacts
+        shell: bash
+        run: |
+          mkdir -p release
+          for dir in artifacts/jj-*/; do
+            target=$(basename "$dir" | sed 's/^jj-//')
+            chmod +x "$dir/jj"
+            tar -czf "release/jj-${target}.tar.gz" -C "$dir" jj
+          done
+
+      - name: Create or update rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create latest \
+            --title "Latest Build" \
+            --notes "Rolling release — updated on every push to main." \
+            --prerelease \
+            release/* \
+            2>/dev/null || \
+          gh release upload latest \
+            release/* \
+            --clobber
