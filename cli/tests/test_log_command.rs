@@ -952,6 +952,89 @@ fn test_log_reversed_disconnected_components() {
 }
 
 #[test]
+fn test_log_reversed_limit_with_merges() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    // Create a graph where a merge commit has parents on two branches, and
+    // --limit cuts off one branch:
+    //
+    //   F (@)
+    //   |
+    //   E  (merge of C and D)
+    //  /|
+    // C D
+    // | |
+    // B |
+    //  \|
+    //   A
+    //   |
+    //  root
+    work_dir.run_jj(["new", "root()", "-m", "A"]).success();
+    work_dir
+        .run_jj(["bookmark", "create", "a", "-r", "@"])
+        .success();
+    work_dir.run_jj(["new", "-m", "B"]).success();
+    work_dir.run_jj(["new", "-m", "C"]).success();
+    work_dir
+        .run_jj(["bookmark", "create", "c", "-r", "@"])
+        .success();
+    work_dir.run_jj(["new", "a", "-m", "D"]).success();
+    work_dir
+        .run_jj(["bookmark", "create", "d", "-r", "@"])
+        .success();
+    work_dir.run_jj(["new", "c", "d", "-m", "E"]).success();
+    work_dir.run_jj(["new", "-m", "F"]).success();
+
+    // Forward with --limit=4: F, E, D, C are shown. E is a merge of C and D.
+    // B and A are cut off by the limit.
+    let output = work_dir.run_jj(["log", "-T", "description", "--limit=4"]);
+    insta::assert_snapshot!(output, @r"
+    @  F
+    ○    E
+    ├─╮
+    │ ○  D
+    ○ │  C
+    [EOF]
+    ");
+
+    // Reversed with --limit=4: C and D have ancestors cut by the limit. Their
+    // edges trail off the top of the output, mirroring how forward mode
+    // trails off the bottom.
+    let output = work_dir.run_jj(["log", "-T", "description", "--limit=4", "--reversed"]);
+    insta::assert_snapshot!(output, @r"
+    ○ │  C
+    │ ○  D
+    ├─╯
+    ○  E
+    @  F
+    [EOF]
+    ");
+
+    // Same test with --limit=3: only F, E, D shown. E is a merge but C is cut.
+    // In reversed mode, D has an elided ancestor, and E should show the merge
+    // structure with the elided child standing in for C.
+    let output = work_dir.run_jj(["log", "-T", "description", "--limit=3"]);
+    insta::assert_snapshot!(output, @r"
+    @  F
+    ○    E
+    ├─╮
+    │ ○  D
+    [EOF]
+    ");
+
+    let output = work_dir.run_jj(["log", "-T", "description", "--limit=3", "--reversed"]);
+    insta::assert_snapshot!(output, @r"
+    ○ │  D
+    ├─╯
+    ○  E
+    @  F
+    [EOF]
+    ");
+}
+
+#[test]
 fn test_log_filtered_by_path() {
     let test_env = TestEnvironment::default();
     test_env.run_jj_in(".", ["git", "init", "repo"]).success();
@@ -1105,11 +1188,12 @@ fn test_log_limit() {
     [EOF]
     ");
 
-    // Applied on reversed DAG: Because the node "a" is omitted, "b" and "c" are
-    // rendered as roots.
+    // Applied on reversed DAG: Because the node "a" is omitted, "b" and "c"
+    // have edges that trail off the top, mirroring how forward mode trails
+    // off the bottom.
     let output = work_dir.run_jj(["log", "-T", "description", "--limit=3", "--reversed"]);
     insta::assert_snapshot!(output, @"
-    ○  c
+    ○ │  c
     │ ○  b
     ├─╯
     @  d

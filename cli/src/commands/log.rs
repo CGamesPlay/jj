@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cell::Cell;
 use std::cmp::min;
+use std::collections::HashSet;
+use std::io;
+use std::io::Write;
+use std::rc::Rc;
 
 use clap_complete::ArgValueCandidates;
 use clap_complete::ArgValueCompleter;
@@ -48,6 +53,55 @@ use crate::graphlog::GraphStyle;
 use crate::graphlog::get_graphlog;
 use crate::templater::TemplateRenderer;
 use crate::ui::Ui;
+
+/// Shared flag to control whether a [`MutableWriter`] is muted.
+///
+/// This handle can be cloned and used to toggle muting while the writer
+/// is mutably borrowed by something else (e.g. a graph renderer).
+#[derive(Clone)]
+struct MuteHandle(Rc<Cell<bool>>);
+
+impl MuteHandle {
+    fn set_muted(&self, muted: bool) {
+        self.0.set(muted);
+    }
+}
+
+/// A writer wrapper that can be muted. When muted, all writes are silently
+/// discarded; when unmuted, writes pass through to the inner writer.
+///
+/// The muted state is controlled via a [`MuteHandle`], which can be held
+/// separately from the writer.
+struct MutableWriter<W> {
+    inner: W,
+    muted: Rc<Cell<bool>>,
+}
+
+impl<W> MutableWriter<W> {
+    fn new(inner: W) -> (Self, MuteHandle) {
+        let flag = Rc::new(Cell::new(false));
+        let handle = MuteHandle(Rc::clone(&flag));
+        (Self { inner, muted: flag }, handle)
+    }
+}
+
+impl<W: Write> Write for MutableWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.muted.get() {
+            Ok(buf.len())
+        } else {
+            self.inner.write(buf)
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.muted.get() {
+            Ok(())
+        } else {
+            self.inner.flush()
+        }
+    }
+}
 
 /// Show revision history
 ///
@@ -220,8 +274,9 @@ pub(crate) async fn cmd_log(
         let formatter = formatter.as_mut();
 
         if !args.no_graph {
-            let mut raw_output = formatter.raw()?;
-            let mut graph = get_graphlog(graph_style, raw_output.as_mut());
+            let raw_output = formatter.raw()?;
+            let (mut mutable_output, mute_handle) = MutableWriter::new(raw_output);
+            let mut graph = get_graphlog(graph_style, &mut mutable_output);
             let mut stream: LocalBoxStream<_> = {
                 let mut topo_order = TopoGroupedGraph::new(revset.stream_graph(), |id| id);
 
@@ -241,8 +296,29 @@ pub(crate) async fn cmd_log(
 
                 if args.reversed {
                     let nodes: Vec<_> = display_stream.collect().await;
-                    let nodes = reverse_graph(nodes.into_iter(), |id| id)?;
-                    stream::iter(nodes.into_iter().map(Ok)).boxed_local()
+                    let forward_iter = nodes.into_iter();
+                    // Replace edges to nodes outside the set with edges to
+                    // synthetic LimitTruncatedParentsOf nodes. These survive
+                    // the reversal and are rendered silently so their columns
+                    // trail off the top of the output.
+                    let nodes = create_truncated_parent_nodes(forward_iter)?;
+                    let mut reversed = reverse_graph(
+                        nodes.into_iter().map(Ok::<_, CommandError>),
+                        |id: &DisplayNode| id,
+                    )?;
+                    // Move all limit-truncated phantom nodes to the front so
+                    // they are rendered before any visible node.
+                    let mut phantoms = Vec::new();
+                    let mut rest = Vec::new();
+                    for entry in reversed.drain(..) {
+                        if matches!(entry.0, DisplayNode::LimitTruncatedParentsOf(..)) {
+                            phantoms.push(entry);
+                        } else {
+                            rest.push(entry);
+                        }
+                    }
+                    phantoms.extend(rest);
+                    stream::iter(phantoms.into_iter().map(Ok)).boxed_local()
                 } else {
                     display_stream.boxed_local()
                 }
@@ -295,6 +371,16 @@ pub(crate) async fn cmd_log(
                         None
                     }
                     DisplayNode::MissingParentsOf(..) => None,
+                    DisplayNode::LimitTruncatedParentsOf(..) => {
+                        // These phantom nodes have been moved to the front of
+                        // the reversed graph. Mute the output so renderdag
+                        // tracks their columns but produces no visible output —
+                        // their edges trail off the top of the graph.
+                        mute_handle.set_muted(true);
+                        graph.add_node(&node, &edges, "", "")?;
+                        mute_handle.set_muted(false);
+                        continue;
+                    }
                 };
 
                 let node_symbol = format_template(ui, &commit, &node_template);
@@ -384,6 +470,55 @@ enum DisplayNode {
     IndirectPath { child: CommitId, ancestor: CommitId },
     /// Prints the representation of all elided parents of the commit
     MissingParentsOf(CommitId),
+    /// Represents parents that were truncated by `--limit`. In reversed mode,
+    /// these are rendered silently so their edges trail off the top of the
+    /// output, mirroring how forward mode trails off the bottom.
+    LimitTruncatedParentsOf(CommitId),
+}
+
+/// Handle edges truncated by `--limit` in reversed mode.
+///
+/// When `--limit` truncates the graph, some edges point to nodes that were not
+/// included. In reversed mode, these edges would be lost during reversal. This
+/// function replaces them with edges to synthetic `LimitTruncatedParentsOf`
+/// nodes, which will be rendered silently so their columns trail off the top of
+/// the output.
+fn create_truncated_parent_nodes(
+    input: impl Iterator<Item = Result<GraphNode<DisplayNode, DisplayNode>, CommandError>>,
+) -> Result<Vec<GraphNode<DisplayNode, DisplayNode>>, CommandError> {
+    let nodes: Vec<_> = input.collect::<Result<Vec<_>, _>>()?;
+    let node_ids: HashSet<DisplayNode> = nodes.iter().map(|(id, _)| id.clone()).collect();
+    let mut synthetic_nodes: Vec<GraphNode<DisplayNode, DisplayNode>> = Vec::new();
+    let nodes = nodes
+        .into_iter()
+        .map(|(id, edges)| {
+            let commit_id = match &id {
+                DisplayNode::Present(c) => Some(c.clone()),
+                _ => None,
+            };
+            let edges = edges
+                .into_iter()
+                .map(|edge| {
+                    if edge.is_missing() || node_ids.contains(&edge.target) {
+                        edge
+                    } else if let Some(commit_id) = &commit_id {
+                        let synthetic = DisplayNode::LimitTruncatedParentsOf(commit_id.clone());
+                        if !synthetic_nodes.iter().any(|(n, _)| n == &synthetic) {
+                            synthetic_nodes.push((synthetic.clone(), vec![]));
+                        }
+                        GraphEdge::direct(synthetic)
+                    } else {
+                        edge
+                    }
+                })
+                .collect();
+            (id, edges)
+        })
+        .collect::<Vec<_>>();
+    let mut result = Vec::with_capacity(nodes.len() + synthetic_nodes.len());
+    result.extend(nodes);
+    result.extend(synthetic_nodes);
+    Ok(result)
 }
 
 /// Convert a revision graph into a display-suitable format.
