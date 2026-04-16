@@ -67,7 +67,9 @@ use jj_lib::config::ConfigSource;
 use jj_lib::config::ConfigValue;
 use jj_lib::config::StackedConfig;
 use jj_lib::conflicts::ConflictMarkerStyle;
+use jj_lib::dsl_util::escape_string;
 use jj_lib::fileset;
+use jj_lib::fileset::FilePattern;
 use jj_lib::fileset::FilesetAliasesMap;
 use jj_lib::fileset::FilesetDiagnostics;
 use jj_lib::fileset::FilesetExpression;
@@ -3188,6 +3190,86 @@ pub fn print_unmatched_explicit_paths<'a>(
         )?;
     }
 
+    Ok(())
+}
+
+/// Prints a hint when a bare string argument was parsed as a glob pattern but
+/// the same string names a literal path that exists in one of the given trees.
+///
+/// Bare strings are parsed as `PrefixGlob` patterns, so a path like
+/// `src/[slug]/` containing glob metacharacters silently matches nothing
+/// instead of the literal directory the user intended.
+pub fn print_glob_literal_path_hints<'a>(
+    ui: &Ui,
+    workspace_command: &WorkspaceCommandHelper,
+    file_args: &[String],
+    trees: impl IntoIterator<Item = &'a MergedTree>,
+) -> io::Result<()> {
+    let trees: Vec<&MergedTree> = trees.into_iter().collect();
+    if trees.is_empty() {
+        return Ok(());
+    }
+    // A tree read error here means the hint is skipped for that argument.
+    // Propagating would abort the command for a purely advisory check; if the
+    // tree is unreadable the actual command operation will fail with a clearer
+    // error shortly after.
+    print_glob_literal_path_hints_impl(ui, workspace_command, file_args, |path| {
+        trees
+            .iter()
+            .any(|tree| tree.path_value(path).block_on().map_or(false, |v| !v.is_absent()))
+    })
+}
+
+/// Like [`print_glob_literal_path_hints`], but checks path existence on the
+/// filesystem rather than in a commit tree.
+///
+/// Used by commands (such as `file track`) that operate on the working
+/// directory directly rather than on a specific commit.
+pub fn print_glob_literal_path_hints_fs(
+    ui: &Ui,
+    workspace_command: &WorkspaceCommandHelper,
+    file_args: &[String],
+) -> io::Result<()> {
+    let workspace_root = workspace_command.workspace_root().to_owned();
+    print_glob_literal_path_hints_impl(ui, workspace_command, file_args, |path| {
+        path.to_fs_path(&workspace_root).map_or(false, |p| p.exists())
+    })
+}
+
+fn print_glob_literal_path_hints_impl(
+    ui: &Ui,
+    workspace_command: &WorkspaceCommandHelper,
+    file_args: &[String],
+    exists: impl Fn(&RepoPath) -> bool,
+) -> io::Result<()> {
+    let fileset_context = workspace_command.env().fileset_parse_context();
+    for path_str in file_args {
+        let mut diagnostics = FilesetDiagnostics::new();
+        let Ok(expr) =
+            fileset::parse_maybe_bare(&mut diagnostics, path_str, &fileset_context)
+        else {
+            continue;
+        };
+        let FilesetExpression::Pattern(FilePattern::PrefixGlob { .. }) = &expr else {
+            continue;
+        };
+        let Ok(literal_path) = workspace_command.parse_file_path(path_str) else {
+            continue;
+        };
+        if exists(&literal_path) {
+            let escaped = escape_string(path_str);
+            writeln!(
+                ui.warning_default(),
+                "Argument '{path_str}' is being interpreted as a glob pattern, not a literal \
+                 path.",
+            )?;
+            writeln!(
+                ui.hint_default(),
+                "Use cwd:\"{escaped}\" to match the literal path, or \
+                 prefix-glob:\"{escaped}\" to match it as a prefix glob.",
+            )?;
+        }
+    }
     Ok(())
 }
 

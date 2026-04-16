@@ -20,6 +20,7 @@ use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::RevisionArg;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
 use crate::complete;
@@ -93,6 +94,7 @@ pub(crate) async fn cmd_interdiff(
         .resolve_single_rev(ui, args.to.as_ref().unwrap_or(&RevisionArg::AT))
         .await?;
     let repo = workspace_command.repo();
+    print_glob_literal_path_hints(ui, &workspace_command, &args.paths, [&from.tree(), &to.tree()])?;
     let fileset_expression = workspace_command.parse_file_patterns(ui, &args.paths)?;
     let matcher = fileset_expression.to_matcher();
 

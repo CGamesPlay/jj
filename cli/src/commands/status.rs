@@ -26,6 +26,7 @@ use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::print_conflicted_paths;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_snapshot_stats;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
@@ -74,6 +75,13 @@ pub(crate) async fn cmd_status(
         .get_wc_commit_id()
         .map(|id| repo.store().get_commit(id))
         .transpose()?;
+    let wc_tree = maybe_wc_commit.as_ref().map(|c| c.tree());
+    print_glob_literal_path_hints(
+        ui,
+        &workspace_command,
+        &args.paths,
+        wc_tree.iter().map(|t| t),
+    )?;
     let fileset_expression = workspace_command.parse_file_patterns(ui, &args.paths)?;
     let matcher = fileset_expression.to_matcher();
     ui.request_pager();

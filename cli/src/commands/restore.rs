@@ -25,6 +25,7 @@ use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::RevisionArg;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
 use crate::command_error::user_error;
@@ -137,11 +138,14 @@ pub(crate) async fn cmd_restore(
     }
     workspace_command.check_rewritable([to_commit.id()]).await?;
 
+    let to_tree = to_commit.tree();
+
+    print_glob_literal_path_hints(ui, &workspace_command, &args.paths, [&to_tree])?;
+
     let fileset_expression = workspace_command.parse_file_patterns(ui, &args.paths)?;
     let matcher = fileset_expression.to_matcher();
     let diff_selector =
         workspace_command.diff_selector(ui, args.tool.as_deref(), args.interactive)?;
-    let to_tree = to_commit.tree();
     let format_instructions = || {
         formatdoc! {"
             You are restoring changes from: {from_commits}

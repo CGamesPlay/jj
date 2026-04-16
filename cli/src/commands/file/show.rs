@@ -33,6 +33,7 @@ use tracing::instrument;
 use crate::cli_util::CommandHelper;
 use crate::cli_util::RevisionArg;
 use crate::cli_util::WorkspaceCommandHelper;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
 use crate::command_error::user_error;
@@ -86,6 +87,7 @@ pub(crate) async fn cmd_file_show(
         .resolve_single_rev(ui, &args.revision)
         .await?;
     let tree = commit.tree();
+    print_glob_literal_path_hints(ui, &workspace_command, &args.paths, [&tree])?;
     // TODO: No need to add special case for empty paths when switching to
     // parse_union_filesets(). paths = [] should be "none()" if supported.
     let fileset_expression = workspace_command.parse_file_patterns(ui, &args.paths)?;

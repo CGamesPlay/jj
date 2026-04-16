@@ -46,6 +46,7 @@ use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::RevisionArg;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
 use crate::command_error::config_error;
@@ -226,6 +227,7 @@ pub(crate) async fn cmd_fix(
 
     let trees: Vec<_> = commits.iter().map(|commit| commit.tree()).collect();
 
+    print_glob_literal_path_hints(ui, &workspace_command, &args.paths, trees.iter())?;
     let fileset_expression = workspace_command.parse_file_patterns(ui, &args.paths)?;
     let matcher = fileset_expression.to_matcher();
 

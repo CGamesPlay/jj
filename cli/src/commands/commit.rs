@@ -22,6 +22,7 @@ use jj_lib::repo::Repo as _;
 use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::command_error::CommandError;
 use crate::command_error::user_error;
 use crate::complete;
@@ -130,6 +131,7 @@ pub(crate) async fn cmd_commit(
         .get_wc_commit_id()
         .ok_or_else(|| user_error("This command requires a working copy"))?;
     let commit = workspace_command.repo().store().get_commit(commit_id)?;
+    print_glob_literal_path_hints(ui, &workspace_command, &args.paths, [&commit.tree()])?;
     let matcher = workspace_command
         .parse_file_patterns(ui, &args.paths)?
         .to_matcher();

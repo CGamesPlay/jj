@@ -22,6 +22,7 @@ use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::export_working_copy_changes_to_git;
+use crate::cli_util::print_glob_literal_path_hints_fs;
 use crate::cli_util::print_snapshot_stats;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
@@ -48,6 +49,7 @@ pub(crate) async fn cmd_file_untrack(
     args: &FileUntrackArgs,
 ) -> Result<(), CommandError> {
     let mut workspace_command = command.workspace_helper(ui)?;
+    print_glob_literal_path_hints_fs(ui, &workspace_command, &args.paths)?;
     let fileset_expression = workspace_command.parse_file_patterns(ui, &args.paths)?;
     let matcher = fileset_expression.to_matcher();
     let auto_tracking_matcher = workspace_command.auto_tracking_matcher(ui)?;

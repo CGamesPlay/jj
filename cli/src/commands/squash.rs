@@ -36,6 +36,7 @@ use crate::cli_util::DiffSelector;
 use crate::cli_util::RevisionArg;
 use crate::cli_util::WorkspaceCommandTransaction;
 use crate::cli_util::compute_commit_location;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
 use crate::command_error::user_error;
@@ -309,6 +310,12 @@ pub(crate) async fn cmd_squash(
         commit
     };
 
+    print_glob_literal_path_hints(
+        ui,
+        tx.base_workspace_helper(),
+        &args.paths,
+        sources.iter().map(|c| c.tree()).collect::<Vec<_>>().iter(),
+    )?;
     let fileset_expression = tx
         .base_workspace_helper()
         .parse_file_patterns(ui, &args.paths)?;

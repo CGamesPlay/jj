@@ -21,6 +21,7 @@ use jj_lib::working_copy::UntrackedReason;
 use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
+use crate::cli_util::print_glob_literal_path_hints_fs;
 use crate::cli_util::print_large_file_hint;
 use crate::cli_util::print_untracked_files;
 use crate::command_error::CommandError;
@@ -58,6 +59,7 @@ pub(crate) async fn cmd_file_track(
     args: &FileTrackArgs,
 ) -> Result<(), CommandError> {
     let (mut workspace_command, auto_stats) = command.workspace_helper_with_stats(ui)?;
+    print_glob_literal_path_hints_fs(ui, &workspace_command, &args.paths)?;
     let matcher = workspace_command
         .parse_file_patterns(ui, &args.paths)?
         .to_matcher();

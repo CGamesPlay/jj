@@ -40,6 +40,7 @@ use crate::cli_util::RevisionArg;
 use crate::cli_util::WorkspaceCommandHelper;
 use crate::cli_util::WorkspaceCommandTransaction;
 use crate::cli_util::compute_commit_location;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::command_error::CommandError;
 use crate::complete;
@@ -213,6 +214,7 @@ impl SplitArgs {
             .check_rewritable([target_commit.id()])
             .await?;
         let repo = workspace_command.repo();
+        print_glob_literal_path_hints(ui, workspace_command, &self.paths, [&target_commit.tree()])?;
         let fileset_expression = workspace_command.parse_file_patterns(ui, &self.paths)?;
         let matcher = fileset_expression.to_matcher();
         let diff_selector = workspace_command.diff_selector(

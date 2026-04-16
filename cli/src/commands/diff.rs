@@ -26,6 +26,7 @@ use tracing::instrument;
 
 use crate::cli_util::CommandHelper;
 use crate::cli_util::RevisionArg;
+use crate::cli_util::print_glob_literal_path_hints;
 use crate::cli_util::print_unmatched_explicit_paths;
 use crate::cli_util::short_commit_hash;
 use crate::command_error::CommandError;
@@ -191,6 +192,8 @@ pub(crate) async fn cmd_diff(
             }
         }
     }
+
+    print_glob_literal_path_hints(ui, &workspace_command, &args.paths, [&from_tree, &to_tree])?;
 
     // -T disables both short/long rendering formats, but it might be okay to
     // enable long format if explicitly specified (assuming -T is for short or
