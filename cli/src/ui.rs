@@ -55,11 +55,13 @@ enum UiOutput {
     Paged {
         child: Child,
         child_stdin: ChildStdin,
+        orig_stderr: Option<Stderr>,
     },
     BuiltinPaged {
         out_wr: PipeWriter,
         err_wr: PipeWriter,
         pager_thread: JoinHandle<streampager::Result<()>>,
+        orig_stderr: Option<Stderr>,
     },
     Null,
 }
@@ -72,15 +74,22 @@ impl UiOutput {
         }
     }
 
-    fn new_paged(pager_cmd: &CommandNameAndArgs) -> io::Result<Self> {
+    fn new_paged(pager_cmd: &CommandNameAndArgs, orig_stderr: Option<Stderr>) -> io::Result<Self> {
         let mut cmd = pager_cmd.to_command();
         tracing::info!(?cmd, "spawning pager");
         let mut child = cmd.stdin(Stdio::piped()).spawn()?;
         let child_stdin = child.stdin.take().unwrap();
-        Ok(Self::Paged { child, child_stdin })
+        Ok(Self::Paged {
+            child,
+            child_stdin,
+            orig_stderr,
+        })
     }
 
-    fn new_builtin_paged(config: &StreampagerConfig) -> streampager::Result<Self> {
+    fn new_builtin_paged(
+        config: &StreampagerConfig,
+        orig_stderr: Option<Stderr>,
+    ) -> streampager::Result<Self> {
         let streampager_config = streampager::config::Config {
             wrapping_mode: config.wrapping.into(),
             interface_mode: config.streampager_interface_mode(),
@@ -109,6 +118,7 @@ impl UiOutput {
             out_wr,
             err_wr,
             pager_thread: thread::spawn(|| pager.run()),
+            orig_stderr,
         })
     }
 
@@ -118,6 +128,7 @@ impl UiOutput {
             Self::Paged {
                 mut child,
                 child_stdin,
+                orig_stderr: _,
             } => {
                 drop(child_stdin);
                 if let Err(err) = child.wait() {
@@ -136,6 +147,7 @@ impl UiOutput {
                 out_wr,
                 err_wr,
                 pager_thread,
+                orig_stderr: _,
             } => {
                 drop(out_wr);
                 drop(err_wr);
@@ -377,12 +389,23 @@ impl Ui {
             return;
         }
 
+        let orig_stderr = match &self.output {
+            UiOutput::Terminal { stderr, .. } => {
+                if stderr.is_terminal() {
+                    None
+                } else {
+                    Some(io::stderr())
+                }
+            }
+            _ => None,
+        };
+
         let new_output = match &self.pager {
             PagerConfig::Disabled => {
                 return;
             }
             PagerConfig::Builtin(streampager_config) => {
-                UiOutput::new_builtin_paged(streampager_config)
+                UiOutput::new_builtin_paged(streampager_config, orig_stderr)
                     .inspect_err(|err| {
                         writeln!(
                             self.warning_default(),
@@ -394,7 +417,7 @@ impl Ui {
                     .ok()
             }
             PagerConfig::External(command_name_and_args) => {
-                UiOutput::new_paged(command_name_and_args)
+                UiOutput::new_paged(command_name_and_args, orig_stderr)
                     .inspect_err(|err| {
                         // The pager executable couldn't be found or couldn't be run
                         writeln!(
@@ -447,8 +470,24 @@ impl Ui {
     pub fn stderr(&self) -> UiStderr<'_> {
         match &self.output {
             UiOutput::Terminal { stderr, .. } => UiStderr::Terminal(stderr.lock()),
-            UiOutput::Paged { child_stdin, .. } => UiStderr::Paged(child_stdin),
-            UiOutput::BuiltinPaged { err_wr, .. } => UiStderr::Builtin(err_wr),
+            UiOutput::Paged {
+                child_stdin,
+                orig_stderr: None,
+                ..
+            } => UiStderr::Paged(child_stdin),
+            UiOutput::Paged {
+                orig_stderr: Some(stderr),
+                ..
+            } => UiStderr::Terminal(stderr.lock()),
+            UiOutput::BuiltinPaged {
+                err_wr,
+                orig_stderr: None,
+                ..
+            } => UiStderr::Builtin(err_wr),
+            UiOutput::BuiltinPaged {
+                orig_stderr: Some(stderr),
+                ..
+            } => UiStderr::Terminal(stderr.lock()),
             UiOutput::Null => UiStderr::Null(io::sink()),
         }
     }
@@ -462,8 +501,24 @@ impl Ui {
     pub fn stderr_for_child(&self) -> io::Result<Stdio> {
         match &self.output {
             UiOutput::Terminal { .. } => Ok(Stdio::inherit()),
-            UiOutput::Paged { child_stdin, .. } => Ok(duplicate_child_stdin(child_stdin)?.into()),
-            UiOutput::BuiltinPaged { err_wr, .. } => Ok(err_wr.try_clone()?.into()),
+            UiOutput::Paged {
+                child_stdin,
+                orig_stderr: None,
+                ..
+            } => Ok(duplicate_child_stdin(child_stdin)?.into()),
+            UiOutput::Paged {
+                orig_stderr: Some(_),
+                ..
+            } => Ok(Stdio::inherit()),
+            UiOutput::BuiltinPaged {
+                err_wr,
+                orig_stderr: None,
+                ..
+            } => Ok(err_wr.try_clone()?.into()),
+            UiOutput::BuiltinPaged {
+                orig_stderr: Some(_),
+                ..
+            } => Ok(Stdio::inherit()),
             UiOutput::Null => Ok(Stdio::null()),
         }
     }
