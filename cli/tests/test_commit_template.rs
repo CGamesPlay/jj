@@ -1591,6 +1591,50 @@ fn test_conflicted_files() {
     ");
 }
 
+#[test]
+fn test_executable_conflict() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    // Empty base, so the file is added on both sides (no base term for it).
+    work_dir.run_jj(["commit", "-m", "base"]).success();
+
+    // Left: add "exec-conflict" as executable, plus a normal content conflict.
+    work_dir.write_file("exec-conflict", "same content");
+    work_dir
+        .run_jj(["file", "chmod", "x", "exec-conflict"])
+        .success();
+    work_dir.write_file("content-conflict", "left content");
+    work_dir.run_jj(["commit", "-m", "left"]).success();
+
+    // Right: add "exec-conflict" with identical content but non-executable, so
+    // only the executable bit conflicts.
+    work_dir.run_jj(["new", "subject(base)"]).success();
+    work_dir.write_file("exec-conflict", "same content");
+    work_dir.write_file("content-conflict", "right content");
+    work_dir.run_jj(["commit", "-m", "right"]).success();
+
+    work_dir
+        .run_jj(["new", "subject(left)", "subject(right)"])
+        .success();
+
+    let template = indoc! {r#"
+        self.files().map(|e| separate(" ",
+          e.path(),
+          "conflict=" ++ e.conflict(),
+          "executable=" ++ e.executable(),
+          "executable_conflict=" ++ e.executable_conflict(),
+        )).join("\n") ++ "\n"
+    "#};
+    let output = work_dir.run_jj(["log", "-r", "@", "-T", template, "--no-graph"]);
+    insta::assert_snapshot!(output, @"
+    content-conflict conflict=true executable=false executable_conflict=false
+    exec-conflict conflict=true executable=false executable_conflict=true
+    [EOF]
+    ");
+}
+
 #[cfg(unix)]
 #[test]
 fn test_file_list_symlink() -> TestResult {
