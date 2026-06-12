@@ -798,6 +798,8 @@ This type cannot be printed. The following methods are defined.
 * `.file_type() -> String`: One of `"file"`, `"symlink"`, `"tree"`,
   `"git-submodule"`, or `"conflict"`.
 * `.executable() -> Boolean`: True if the entry is an executable file.
+* `.executable_conflict() -> Boolean`: True if the file's executable bit is
+  conflicted and must be resolved with `jj file chmod`.
 
 ### `WorkspaceRef` type
 

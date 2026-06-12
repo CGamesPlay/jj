@@ -2713,6 +2713,14 @@ fn builtin_tree_entry_methods<'repo>() -> CommitTemplateBuildMethodFnMap<'repo, 
             Ok(out_property.into_dyn_wrapped())
         },
     );
+    map.insert(
+        "executable_conflict",
+        |_language, _diagnostics, _build_ctx, self_property, function| {
+            function.expect_no_arguments()?;
+            let out_property = self_property.map(|entry| has_executable_conflict(&entry.value));
+            Ok(out_property.into_dyn_wrapped())
+        },
+    );
     map
 }
 
@@ -2730,6 +2738,14 @@ fn describe_file_type(value: &MergedTreeValue) -> &'static str {
 fn is_executable_file(value: &MergedTreeValue) -> Option<bool> {
     let executable = value.to_executable_merge()?;
     conflicts::resolve_file_executable(&executable)
+}
+
+/// True if the entry is a file conflict whose executable bit cannot be merged,
+/// meaning it must be resolved with `jj file chmod`.
+fn has_executable_conflict(value: &MergedTreeValue) -> bool {
+    value
+        .to_executable_merge()
+        .is_some_and(|executable| conflicts::resolve_file_executable(&executable).is_none())
 }
 
 /// [`DiffStats`] with rendering parameters.
