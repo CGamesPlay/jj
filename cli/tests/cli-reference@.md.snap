@@ -1797,13 +1797,13 @@ Create a new Git backed repo
 
 Push to a Git remote
 
-By default, pushes tracking bookmarks and tags pointing to `remote_bookmarks(remote=<remote>)..@`. Use `--bookmark`/`--tag` to push specific bookmarks or tags. Use `--all` to push all bookmarks and tags. Use `--change` to generate bookmark names based on the change IDs of specific commits.
+By default, pushes tracking bookmarks and tags pointing to `remote_bookmarks(remote=<remote>)..@`. Use positional arguments or `--bookmark`/`--tag` to push specific bookmarks or tags. Use `--all` to push all bookmarks and tags. Use `--change` to generate bookmark names based on the change IDs of specific commits.
 
 When pushing a bookmark or tag, the command pushes all commits in the range from the remote's current position up to and including its target commit. Any descendant commits beyond the reference are not pushed.
 
 If the local reference has changed from the last fetch, push will update the remote reference to the new position after passing safety checks. This is similar to `git push --force-with-lease` - the remote is updated only if its current state matches what Jujutsu last fetched.
 
-Unlike in Git, the remote to push to is not derived from the tracked remote bookmarks. Use `--remote` to select the remote Git repository by name. There is no option to push to multiple remotes.
+Unlike in Git, the remote to push to is not derived from the tracked remote bookmarks. Use a positional argument or `--remote` to select the remote Git repository by name. There is no option to push to multiple remotes.
 
 Before the command actually moves, creates, or deletes a remote bookmark, it makes several [safety checks]. If there is a problem, you may need to run `jj git fetch --remote <remote name>` and/or resolve some [bookmark conflicts].
 
@@ -1811,7 +1811,20 @@ Before the command actually moves, creates, or deletes a remote bookmark, it mak
 
 [bookmark conflicts]: https://docs.jj-vcs.dev/latest/bookmarks/#conflicts
 
-**Usage:** `jj git push [OPTIONS]`
+**Usage:** `jj git push [OPTIONS] [REMOTE] [BOOKMARK_POS]...`
+
+###### **Arguments:**
+
+* `<REMOTE>` — The remote to push to (only named remotes are supported) [aliases: --remote]
+
+   If the first positional argument matches a named remote, it will be used as the remote. Otherwise, it will be treated as a bookmark.
+* `<BOOKMARK_POS>` — Push only this bookmark, or bookmarks matching a pattern (can be repeated) [aliases: --bookmark, -b]
+
+   If a bookmark isn't tracking anything yet, the remote bookmark will be tracked automatically.
+
+   By default, the specified pattern matches bookmark names with glob syntax. You can also use other [string pattern syntax].
+
+   [string pattern syntax]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 
 ###### **Options:**
 

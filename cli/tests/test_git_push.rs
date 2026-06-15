@@ -2956,6 +2956,134 @@ fn test_git_push_unmapped_refs() {
     ");
 }
 
+#[test]
+fn test_git_push_positional_remote() {
+    let test_env = TestEnvironment::default();
+    set_up(&test_env);
+    test_env.add_config("remotes.origin.auto-track-bookmarks = '*'");
+    let work_dir = test_env.work_dir("local");
+
+    // Modify bookmark1
+    work_dir
+        .run_jj(["describe", "bookmark1", "-m", "modified bookmark1 commit"])
+        .success();
+
+    // Push using positional remote argument
+    let output = work_dir.run_jj(["git", "push", "origin", "bookmark1"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Changes to push to origin:
+      bookmark: bookmark1 [move sideways from 9b2e76de3920 to e5ce6d9a0991]
+    [EOF]
+    ");
+
+    // Verify bookmark1@origin was updated
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    bookmark1: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+      @origin: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+    bookmark2: zsuskuln 38a20473 (empty) description 2
+      @origin: zsuskuln 38a20473 (empty) description 2
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_push_positional_bookmark() {
+    let test_env = TestEnvironment::default();
+    set_up(&test_env);
+    test_env.add_config("remotes.origin.auto-track-bookmarks = '*'");
+    let work_dir = test_env.work_dir("local");
+
+    // Modify bookmark1
+    work_dir
+        .run_jj(["describe", "bookmark1", "-m", "modified bookmark1 commit"])
+        .success();
+
+    // Push using positional bookmark argument
+    let output = work_dir.run_jj(["git", "push", "bookmark1"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Changes to push to origin:
+      bookmark: bookmark1 [move sideways from 9b2e76de3920 to e5ce6d9a0991]
+    [EOF]
+    ");
+
+    // Verify bookmark1@origin was updated
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    bookmark1: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+      @origin: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+    bookmark2: zsuskuln 38a20473 (empty) description 2
+      @origin: zsuskuln 38a20473 (empty) description 2
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_push_positional_bookmark_repeatable() {
+    let test_env = TestEnvironment::default();
+    set_up(&test_env);
+    test_env.add_config("remotes.origin.auto-track-bookmarks = '*'");
+    let work_dir = test_env.work_dir("local");
+
+    // Modify both bookmarks
+    work_dir
+        .run_jj(["describe", "bookmark1", "-m", "modified bookmark1 commit"])
+        .success();
+    work_dir
+        .run_jj(["describe", "bookmark2", "-m", "modified bookmark2 commit"])
+        .success();
+
+    // Push both bookmarks using positional bookmark arguments (repeatable)
+    let output = work_dir.run_jj(["git", "push", "bookmark1", "bookmark2"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Changes to push to origin:
+      bookmark: bookmark1 [move sideways from 9b2e76de3920 to e5ce6d9a0991]
+      bookmark: bookmark2 [move sideways from 38a204733702 to eb5bbacb3a5f]
+    [EOF]
+    ");
+
+    // Verify both bookmarks were updated
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    bookmark1: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+      @origin: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+    bookmark2: zsuskuln eb5bbacb (empty) modified bookmark2 commit
+      @origin: zsuskuln eb5bbacb (empty) modified bookmark2 commit
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_push_positional_remote_and_bookmark() {
+    let test_env = TestEnvironment::default();
+    set_up(&test_env);
+    test_env.add_config("remotes.origin.auto-track-bookmarks = '*'");
+    let work_dir = test_env.work_dir("local");
+
+    // Modify bookmark1
+    work_dir
+        .run_jj(["describe", "bookmark1", "-m", "modified bookmark1 commit"])
+        .success();
+
+    // Push to origin using positional arguments
+    let output = work_dir.run_jj(["git", "push", "origin", "bookmark1"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Changes to push to origin:
+      bookmark: bookmark1 [move sideways from 9b2e76de3920 to e5ce6d9a0991]
+    [EOF]
+    ");
+
+    // Verify bookmark1@origin was updated
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    bookmark1: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+      @origin: qpvuntsm e5ce6d9a (empty) modified bookmark1 commit
+    bookmark2: zsuskuln 38a20473 (empty) description 2
+      @origin: zsuskuln 38a20473 (empty) description 2
+    [EOF]
+    ");
+}
+
 #[must_use]
 fn get_bookmark_output(work_dir: &TestWorkDir) -> CommandOutput {
     // --quiet to suppress deleted bookmarks hint

@@ -86,10 +86,10 @@ use crate::ui::Ui;
 /// Push to a Git remote
 ///
 /// By default, pushes tracking bookmarks and tags pointing to
-/// `remote_bookmarks(remote=<remote>)..@`. Use `--bookmark`/`--tag` to push
-/// specific bookmarks or tags. Use `--all` to push all bookmarks and tags. Use
-/// `--change` to generate bookmark names based on the change IDs of specific
-/// commits.
+/// `remote_bookmarks(remote=<remote>)..@`. Use positional arguments or
+/// `--bookmark`/`--tag` to push specific bookmarks or tags. Use `--all` to
+/// push all bookmarks and tags. Use `--change` to generate bookmark names based
+/// on the change IDs of specific commits.
 ///
 /// When pushing a bookmark or tag, the command pushes all commits in the range
 /// from the remote's current position up to and including its target
@@ -101,8 +101,8 @@ use crate::ui::Ui;
 /// current state matches what Jujutsu last fetched.
 ///
 /// Unlike in Git, the remote to push to is not derived from the tracked remote
-/// bookmarks. Use `--remote` to select the remote Git repository by name. There
-/// is no option to push to multiple remotes.
+/// bookmarks. Use a positional argument or `--remote` to select the remote Git
+/// repository by name. There is no option to push to multiple remotes.
 ///
 /// Before the command actually moves, creates, or deletes a remote bookmark, it
 /// makes several [safety checks]. If there is a problem, you may need to run
@@ -123,9 +123,18 @@ pub struct GitPushArgs {
     ///
     /// This defaults to the `git.push` setting. If that is not configured, and
     /// if there are multiple remotes, the remote named "origin" will be used.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "remote_pos")]
     #[arg(add = ArgValueCandidates::new(complete::git_remotes))]
     remote: Option<RemoteNameBuf>,
+
+    /// The remote to push to (only named remotes are supported) [aliases:
+    /// --remote]
+    ///
+    /// If the first positional argument matches a named remote, it will be used
+    /// as the remote. Otherwise, it will be treated as a bookmark.
+    #[arg(value_name = "REMOTE")]
+    #[arg(add = ArgValueCandidates::new(complete::git_remotes))]
+    remote_pos: Option<String>,
 
     /// Push only this bookmark, or bookmarks matching a pattern (can be
     /// repeated)
@@ -141,6 +150,21 @@ pub struct GitPushArgs {
     #[arg(long, short, alias = "branch", group = "specific")]
     #[arg(add = ArgValueCandidates::new(complete::local_bookmarks))]
     bookmark: Vec<String>,
+
+    /// Push only this bookmark, or bookmarks matching a pattern (can be
+    /// repeated) [aliases: --bookmark, -b]
+    ///
+    /// If a bookmark isn't tracking anything yet, the remote bookmark will be
+    /// tracked automatically.
+    ///
+    /// By default, the specified pattern matches bookmark names with glob
+    /// syntax. You can also use other [string pattern syntax].
+    ///
+    /// [string pattern syntax]:
+    ///     https://docs.jj-vcs.dev/latest/revsets/#string-patterns
+    #[arg(group = "specific")]
+    #[arg(add = ArgValueCandidates::new(complete::local_bookmarks))]
+    bookmark_pos: Vec<String>,
 
     /// Push only this tag, or tags matching a pattern (can be repeated)
     ///
@@ -279,7 +303,27 @@ pub async fn cmd_git_push(
     let mut workspace_command = command.workspace_helper(ui).await?;
 
     let default_remote;
-    let remote = if let Some(name) = &args.remote {
+    let remote_name = if let Some(name) = &args.remote {
+        Some(name.clone())
+    } else if let Some(remote_pos) = &args.remote_pos {
+        // Try to parse the first positional as a remote name
+        let repo = workspace_command.repo().clone();
+        let remote_name = RemoteName::new(remote_pos);
+        let store = repo.store().clone();
+        let all_remotes = jj_lib::git::get_all_remote_names(&store)?;
+        let is_valid_remote = all_remotes.iter().any(|r| r.as_str() == remote_pos);
+        if is_valid_remote {
+            // This is a valid remote name
+            Some(RemoteNameBuf::from(remote_name))
+        } else {
+            // Not a valid remote, will be treated as a bookmark
+            None
+        }
+    } else {
+        None
+    };
+
+    let remote = if let Some(name) = &remote_name {
         name
     } else {
         default_remote = get_default_push_remote(ui, &workspace_command)?;
@@ -449,7 +493,22 @@ pub async fn cmd_git_push(
         }
 
         let view = tx.repo().view();
-        let bookmarks_by_name = find_bookmarks_to_push(ui, view, &args.bookmark, remote)?;
+        let mut bookmarks: Vec<_> = args
+            .bookmark
+            .iter()
+            .chain(args.bookmark_pos.iter())
+            .cloned()
+            .collect();
+        // If remote_pos is provided but doesn't match a remote, treat it as a bookmark
+        if let Some(remote_pos) = &args.remote_pos {
+            let store = tx.repo().store().clone();
+            let all_remotes = jj_lib::git::get_all_remote_names(&store)?;
+            let is_valid_remote = all_remotes.iter().any(|r| r.as_str() == remote_pos);
+            if !is_valid_remote && !remote_pos.starts_with('-') {
+                bookmarks.push(remote_pos.clone());
+            }
+        }
+        let bookmarks_by_name = find_bookmarks_to_push(ui, view, &bookmarks, remote)?;
         for &(name, targets) in &bookmarks_by_name {
             if !seen_bookmarks.insert(name) {
                 continue;
@@ -500,6 +559,8 @@ pub async fn cmd_git_push(
             .map_err(|reason| reason.to_command_error(tx.base_workspace_helper()))?;
 
         let use_default_revset = args.bookmark.is_empty()
+            && args.bookmark_pos.is_empty()
+            && (args.remote_pos.is_none() || remote_name.is_some())
             && args.tag.is_empty()
             && args.change.is_empty()
             && args.revisions.is_empty()
