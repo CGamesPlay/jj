@@ -14,8 +14,8 @@ active/current/checked-out bookmark.
 ## Mapping to Git branches
 
 Jujutsu maps its bookmarks to Git branches when interacting with Git repos. For
-example, `jj git push --bookmark foo` will push the state of the `foo` bookmark
-to the `foo` branch on the Git remote. Similarly, if you create a `bar` branch
+example, `jj git push --bookmark foo` or `jj git push foo` will push the state
+of the `foo` bookmark to the `foo` branch on the Git remote. Similarly, if you create a `bar` branch
 in the backing Git repo, then a subsequent `jj git import` will create a `bar`
 bookmark (reminder: that import happens automatically in
 [colocated workspaces][colocated-workspaces]).
@@ -165,7 +165,10 @@ current bookmark commit, even if it isn't entirely accurate.
 ## Pushing bookmarks: Safety checks
 
 Before `jj git push` actually moves, creates, or deletes a remote bookmark, it
-makes several safety checks.
+makes several safety checks. You can specify the remote and bookmarks using
+positional arguments: `jj git push [REMOTE] [BOOKMARK]...`. For example,
+`jj git push origin main` is equivalent to `jj git push --remote origin
+--bookmark main`.
 
 1. `jj` will contact the remote and check that the actual state of the remote
    bookmark matches `jj`'s record of its last known position. If there is a
