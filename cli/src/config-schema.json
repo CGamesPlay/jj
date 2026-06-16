@@ -17,6 +17,10 @@
                     "type": "string",
                     "description": "User's email address, used in commits",
                     "format": "email"
+                },
+                "timezone": {
+                    "type": "string",
+                    "description": "Timezone used for commit and operation timestamps, like exporting TZ before running jj (e.g. \"America/New_York\", \"UTC\", \"UTC-05:30\", \"EST5EDT\"). Defaults to the system timezone."
                 }
             }
         },

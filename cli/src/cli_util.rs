@@ -4625,6 +4625,7 @@ impl<'a> CliRunner<'a> {
         }
 
         let settings = UserSettings::from_config(config)?;
+        apply_user_timezone(&settings);
         let command_helper_data = CommandHelperData {
             app: self.app,
             cwd,
@@ -4672,6 +4673,36 @@ impl<'a> CliRunner<'a> {
         let exit_code = handle_command_result(&mut ui, result);
         ui.finalize_pager();
         exit_code
+    }
+}
+
+/// Applies the `user.timezone` config setting by exporting it as the `TZ`
+/// environment variable.
+///
+/// This makes the configured timezone take effect everywhere jj reads the
+/// local timezone (via `chrono::offset::Local`), including commit and operation
+/// timestamps and timestamp display. It is equivalent to exporting `TZ` before
+/// running jj.
+///
+/// A `TZ` variable already present in the environment takes precedence over
+/// the config value and is left untouched.
+fn apply_user_timezone(settings: &UserSettings) {
+    // A `TZ` already set in the environment (e.g. exported in the shell) wins
+    // over the config value.
+    if env::var_os("TZ").is_some() {
+        return;
+    }
+    let Some(tz) = settings
+        .get_string("user.timezone")
+        .ok()
+        .filter(|tz| !tz.is_empty())
+    else {
+        return;
+    };
+    // SAFETY: This runs during single-threaded startup (in `parse()`), before
+    // any async runtime or worker threads exist.
+    unsafe {
+        env::set_var("TZ", &tz);
     }
 }
 

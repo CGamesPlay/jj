@@ -128,9 +128,23 @@ want.
 [user]
 name = "YOUR NAME"
 email = "YOUR_EMAIL@example.com"
+timezone = "America/New_York"
 ```
 
 Don't forget to change these to your own details!
+
+`timezone` is optional and controls the timezone jj uses for commit and
+operation timestamps. It is equivalent to exporting the [`TZ` environment
+variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08)
+before running jj, and accepts the same values: IANA zone names such as
+`America/New_York` or `Europe/Berlin`, fixed offsets such as `UTC` or
+`UTC-05:30`, and POSIX `TZ` strings such as `EST5EDT`. If unset, jj uses the
+system timezone. A `TZ` variable already present in the environment takes
+precedence over this setting. See also the `debug.commit-timestamp` setting,
+which overrides the entire timestamp (including the timezone offset) when set.
+
+On Windows, the system timezone is always used, since the `TZ` environment
+variable is not consulted there.
 
 ## UI settings
 
