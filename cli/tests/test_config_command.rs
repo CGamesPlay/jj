@@ -391,6 +391,72 @@ fn test_config_list_origin() {
     });
 }
 
+#[cfg(unix)] // chrono reads `TZ` only on Unix; on Windows the system zone is used.
+#[test]
+fn test_user_timezone() {
+    // `user.timezone` is exported as the `TZ` environment variable, which
+    // chrono consults when generating commit timestamps. Here we verify the
+    // configured timezone determines the offset stored on commit signatures.
+    // The values use POSIX `TZ` rules (e.g. `EST5` means EST, i.e. UTC-5), the
+    // same format the `TZ` environment variable accepts.
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    // Helper: read the stored committer timestamp offset of the @ commit. Using
+    // `.format()` rather than `.local()` shows the offset actually stored on
+    // the commit instead of re-localizing it for display.
+    let committer_offset = || {
+        work_dir.run_jj([
+            "log",
+            "-r@",
+            "--no-graph",
+            "--ignore-working-copy",
+            "-T",
+            r#"committer.timestamp().format("%:z") ++ "\n""#,
+        ])
+    };
+
+    // The test environment sets JJ_TIMESTAMP, which maps to
+    // `debug.commit-timestamp` and would take precedence over `user.timezone`.
+    // Remove it when describing so the configured timezone determines the
+    // offset of the freshly-generated commit timestamp.
+    let describe = |msg: &str| {
+        work_dir
+            .run_jj_with(|cmd| cmd.args(["describe", "-m", msg]).env_remove("JJ_TIMESTAMP"))
+            .success();
+    };
+
+    test_env.add_config(r#"user.timezone = "EST5""#); // POSIX: EST = UTC-5
+    describe("first");
+    insta::assert_snapshot!(committer_offset(), @r"
+-05:00
+[EOF]
+");
+
+    // A later config file overrides the earlier one. POSIX: JST-9 = UTC+9.
+    test_env.add_config(r#"user.timezone = "JST-9""#);
+    describe("second");
+    insta::assert_snapshot!(committer_offset(), @r"
++09:00
+[EOF]
+");
+
+    // A `TZ` variable already present in the environment takes precedence over
+    // the `user.timezone` config value. POSIX: CET-1 = UTC+1.
+    work_dir
+        .run_jj_with(|cmd| {
+            cmd.args(["describe", "-m", "third"])
+                .env("TZ", "CET-1")
+                .env_remove("JJ_TIMESTAMP")
+        })
+        .success();
+    insta::assert_snapshot!(committer_offset(), @r"
++01:00
+[EOF]
+");
+}
+
 #[test]
 fn test_config_layer_override_default() {
     let test_env = TestEnvironment::default();
