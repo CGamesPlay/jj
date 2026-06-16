@@ -37,7 +37,7 @@ already.
 
 !!! note "Details: how `fetch` pulls bookmarks"
 
-    Let's say you run `jj git fetch --remote origin` and, during the fetch, `jj`
+    Let's say you run `jj git fetch origin` and, during the fetch, `jj`
     determines that the remote's `main` bookmark has been moved so that its target is
     now ahead of the local record in `main@origin`.
 
@@ -98,7 +98,7 @@ $ # [...]
 $ # Actually track the bookmark.
 $ jj bookmark track <bookmark name> --remote=<remote name> # Example: jj bookmark track my-feature --remote=origin
 $ # From this point on, <bookmark name> will be imported when fetching from <remote name>.
-$ jj git fetch --remote <remote name>
+$ jj git fetch <remote name>
 $ # A local bookmark <bookmark name> should have been created or updated while fetching.
 $ jj new <bookmark name> # Do some local testing, etc.
 ```
@@ -173,7 +173,7 @@ positional arguments: `jj git push [REMOTE] [BOOKMARK]...`. For example,
 1. `jj` will contact the remote and check that the actual state of the remote
    bookmark matches `jj`'s record of its last known position. If there is a
    conflict, `jj` will refuse to push the bookmark. In this case, you need to run
-   `jj git fetch --remote <remote name>` and resolve the resulting bookmark
+   `jj git fetch <remote name>` and resolve the resulting bookmark
    conflict. Then, you can try `jj git push` again.
 
    If you are familiar with Git, this makes `jj git push` similar to `git
