@@ -1693,13 +1693,28 @@ Fetch from a Git remote
 
 If no remotes are specified, fetches the remotes specified by the `git.fetch` setting. If that is not configured and there are multiple remotes, the remote named "origin" will be used.
 
+The remote and branches can also be specified as positional arguments: `jj git fetch [REMOTE] [BRANCH]...`. If the first positional argument names an existing remote, it is used as the remote; otherwise it is treated as a branch.
+
 If no branches nor tags are specified, fetches bookmarks and tags specified by the `remotes.<name>.fetch-bookmarks`/`fetch-tags` settings. If `remotes.<name>.fetch-bookmarks` is not configured, the default fetch refspecs for the selected remotes are read from the Git configuration.
 
 Commits that are no longer reachable from any branch on the remote will be considered abandoned by the remote, and will be abandoned in the local repo to match the remote. Set `git.abandon-unreachable-commits` to `false` to disable this behavior.
 
 If a working-copy commit gets abandoned, it will be given a new, empty commit. This is true in general; it is not specific to this command.
 
-**Usage:** `jj git fetch [OPTIONS]`
+**Usage:** `jj git fetch [OPTIONS] [REMOTE] [BRANCH_POS]...`
+
+###### **Arguments:**
+
+* `<REMOTE>` — The remote to fetch from (only named remotes are supported) [aliases: --remote]
+
+   If the first positional argument matches a named remote, it will be used as the remote. Otherwise, it will be treated as a branch.
+* `<BRANCH_POS>` — Name of the branch to fetch (can be repeated) [aliases: --branch, -b]
+
+   By default, the specified pattern matches branch names with glob syntax, but only `*` is expanded. Other wildcard characters such as `?` are *not* supported. Patterns can be repeated or combined with [logical operators] to specify multiple branches, but only union and negative intersection are supported.
+
+   Examples: `push-*`, `(push-* | foo/*) ~ foo/unwanted`
+
+   [logical operators]: https://docs.jj-vcs.dev/latest/revsets/#string-patterns
 
 ###### **Options:**
 

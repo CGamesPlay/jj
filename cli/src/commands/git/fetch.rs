@@ -53,6 +53,11 @@ use crate::ui::Ui;
 /// `git.fetch` setting. If that is not configured and there are multiple
 /// remotes, the remote named "origin" will be used.
 ///
+/// The remote and branches can also be specified as positional arguments:
+/// `jj git fetch [REMOTE] [BRANCH]...`. If the first positional argument names
+/// an existing remote, it is used as the remote; otherwise it is treated as a
+/// branch.
+///
 /// If no branches nor tags are specified, fetches bookmarks and tags specified
 /// by the `remotes.<name>.fetch-bookmarks`/`fetch-tags` settings. If
 /// `remotes.<name>.fetch-bookmarks` is not configured, the default fetch
@@ -118,13 +123,39 @@ pub struct GitFetchArgs {
     ///
     /// [string pattern syntax]:
     ///     https://docs.jj-vcs.dev/latest/revsets/#string-patterns
-    #[arg(long = "remote", value_name = "REMOTE")]
+    #[arg(long = "remote", value_name = "REMOTE", conflicts_with = "remote_pos")]
     #[arg(add = ArgValueCandidates::new(complete::git_remotes))]
     remotes: Option<Vec<String>>,
 
     /// Fetch from all remotes
     #[arg(long, conflicts_with = "remotes")]
+    #[arg(conflicts_with = "remote_pos")]
     all_remotes: bool,
+
+    /// The remote to fetch from (only named remotes are supported) [aliases:
+    /// --remote]
+    ///
+    /// If the first positional argument matches a named remote, it will be used
+    /// as the remote. Otherwise, it will be treated as a branch.
+    #[arg(value_name = "REMOTE")]
+    #[arg(add = ArgValueCandidates::new(complete::git_remotes))]
+    remote_pos: Option<String>,
+
+    /// Name of the branch to fetch (can be repeated) [aliases: --branch, -b]
+    ///
+    /// By default, the specified pattern matches branch names with glob syntax,
+    /// but only `*` is expanded. Other wildcard characters such as `?` are
+    /// *not* supported. Patterns can be repeated or combined with [logical
+    /// operators] to specify multiple branches, but only union and negative
+    /// intersection are supported.
+    ///
+    /// Examples: `push-*`, `(push-* | foo/*) ~ foo/unwanted`
+    ///
+    /// [logical operators]:
+    ///     https://docs.jj-vcs.dev/latest/revsets/#string-patterns
+    #[arg(group = "specific")]
+    #[arg(add = ArgValueCandidates::new(complete::bookmarks))]
+    branch_pos: Vec<String>,
 }
 
 #[tracing::instrument(skip_all)]
@@ -139,17 +170,35 @@ pub async fn cmd_git_fetch(
         return Err(cli_error("--no-integrate-operation is not respected"));
     }
     let mut workspace_command = command.workspace_helper(ui).await?;
+
+    let all_remote_names = git::get_all_remote_names(workspace_command.repo().store())?;
+
+    // The first positional argument names a remote if it matches an existing
+    // remote exactly; otherwise it's treated as a branch. This mirrors
+    // `jj git push`.
+    let remote_pos_is_remote = match &args.remote_pos {
+        Some(name) => all_remote_names.iter().any(|r| r.as_str() == name),
+        None => false,
+    };
+
+    let remotes_arg: Option<Vec<String>> = if let Some(remotes) = &args.remotes {
+        Some(remotes.clone())
+    } else if let Some(remote_pos) = &args.remote_pos {
+        remote_pos_is_remote.then(|| vec![remote_pos.clone()])
+    } else {
+        None
+    };
+
     let remote_expr = if args.all_remotes {
         StringExpression::all()
-    } else if let Some(remotes) = &args.remotes {
+    } else if let Some(remotes) = &remotes_arg {
         parse_union_name_patterns(ui, remotes)?
     } else {
         get_default_fetch_remotes(ui, &workspace_command)?
     };
     let remote_matcher = remote_expr.to_matcher();
 
-    let all_remotes = git::get_all_remote_names(workspace_command.repo().store())?;
-    let matching_remotes: Vec<&RemoteName> = all_remotes
+    let matching_remotes: Vec<&RemoteName> = all_remote_names
         .iter()
         .filter(|r| remote_matcher.is_match(r.as_str()))
         .map(AsRef::as_ref)
@@ -157,8 +206,8 @@ pub async fn cmd_git_fetch(
     let mut unmatched_remotes = remote_expr
         .exact_strings()
         .map(RemoteName::new)
-        // do linear search. all_remotes should be small.
-        .filter(|&name| all_remotes.iter().all(|r| r != name))
+        // do linear search. all_remote_names should be small.
+        .filter(|&name| all_remote_names.iter().all(|r| r != name))
         .peekable();
     if unmatched_remotes.peek().is_some() {
         writeln!(
@@ -174,8 +223,20 @@ pub async fn cmd_git_fetch(
     let mut tx = workspace_command.start_transaction();
     let remote_settings = tx.settings().remote_settings()?;
 
-    let is_specific = args.branches.is_some() || args.tags.is_some();
-    let common_bookmark_expr = match &args.branches {
+    // Merge `--branch` values, positional branch values, and — if the first
+    // positional did not name a remote — that first positional value itself.
+    let mut branch_texts: Vec<String> = args.branches.clone().unwrap_or_default();
+    branch_texts.extend(args.branch_pos.iter().cloned());
+    if let Some(remote_pos) = &args.remote_pos
+        && !remote_pos_is_remote
+        && !remote_pos.starts_with('-')
+    {
+        branch_texts.push(remote_pos.clone());
+    }
+    let branches_arg = (!branch_texts.is_empty()).then_some(branch_texts);
+
+    let is_specific = branches_arg.is_some() || args.tags.is_some();
+    let common_bookmark_expr = match &branches_arg {
         Some(texts) => Some(parse_union_name_patterns(ui, texts)?),
         None => is_specific.then(StringExpression::none),
     };

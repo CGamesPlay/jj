@@ -2661,3 +2661,111 @@ fn test_git_fetch_auto_track_bookmarks() {
     [EOF]
     ");
 }
+
+#[test]
+fn test_git_fetch_positional_remote() {
+    let test_env = TestEnvironment::default();
+    test_env.add_config("remotes.rem1.auto-track-bookmarks = '*'");
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+    add_git_remote(&test_env, &work_dir, "rem1");
+
+    // "rem1" names an existing remote, so it's used as the remote.
+    work_dir.run_jj(["git", "fetch", "rem1"]).success();
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    rem1: ppspxspk 4acd0343 message
+      @rem1: ppspxspk 4acd0343 message
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_fetch_positional_branch() {
+    let test_env = TestEnvironment::default();
+    test_env.add_config("remotes.rem1.auto-track-bookmarks = '*'");
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+    let rem1_repo = add_git_remote(&test_env, &work_dir, "rem1");
+    git::add_commit(&rem1_repo, "refs/heads/foo", "file", b"", "foo", &[]);
+
+    // "foo" is not a remote, so it's treated as a branch (fetched from the
+    // default remote rem1).
+    work_dir.run_jj(["git", "fetch", "foo"]).success();
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    foo: ovlztnpz 09b6d19f foo
+      @rem1: ovlztnpz 09b6d19f foo
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_fetch_positional_remote_and_branch() {
+    let test_env = TestEnvironment::default();
+    test_env.add_config("remotes.rem1.auto-track-bookmarks = '*'");
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+    let rem1_repo = add_git_remote(&test_env, &work_dir, "rem1");
+    git::add_commit(&rem1_repo, "refs/heads/foo", "file", b"", "foo", &[]);
+
+    // "rem1" is the remote, "foo" is the branch to fetch from it.
+    work_dir.run_jj(["git", "fetch", "rem1", "foo"]).success();
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    foo: ovlztnpz 09b6d19f foo
+      @rem1: ovlztnpz 09b6d19f foo
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_fetch_positional_branch_repeatable() {
+    let test_env = TestEnvironment::default();
+    test_env.add_config("remotes.rem1.auto-track-bookmarks = '*'");
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+    let rem1_repo = add_git_remote(&test_env, &work_dir, "rem1");
+    git::add_commit(&rem1_repo, "refs/heads/foo", "file", b"", "foo", &[]);
+    git::add_commit(&rem1_repo, "refs/heads/bar", "file", b"", "bar", &[]);
+
+    // Multiple positional branches are fetched from the default remote rem1.
+    work_dir.run_jj(["git", "fetch", "foo", "bar"]).success();
+    insta::assert_snapshot!(get_bookmark_output(&work_dir), @"
+    bar: urzwykqo ce7d4dd1 bar
+      @rem1: urzwykqo ce7d4dd1 bar
+    foo: ovlztnpz 09b6d19f foo
+      @rem1: ovlztnpz 09b6d19f foo
+    [EOF]
+    ");
+}
+
+#[test]
+fn test_git_fetch_positional_conflicts() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    // The positional remote conflicts with --remote.
+    let output = work_dir.run_jj(["git", "fetch", "--remote", "rem1", "rem1"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    error: the argument '--remote <REMOTE>' cannot be used with '[REMOTE]'
+
+    Usage: jj git fetch --remote <REMOTE> [REMOTE] [BRANCH_POS]...
+
+    For more information, try '--help'.
+    [EOF]
+    [exit status: 2]
+    ");
+
+    // The positional remote conflicts with --all-remotes.
+    let output = work_dir.run_jj(["git", "fetch", "--all-remotes", "rem1"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    error: the argument '--all-remotes' cannot be used with '[REMOTE]'
+
+    Usage: jj git fetch --all-remotes [REMOTE] [BRANCH_POS]...
+
+    For more information, try '--help'.
+    [EOF]
+    [exit status: 2]
+    ");
+}
