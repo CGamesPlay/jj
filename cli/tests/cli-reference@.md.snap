@@ -736,7 +736,7 @@ When using `--interactive` or path arguments, the selected changes stay in the c
 * `-i`, `--interactive` — Interactively choose which changes to include in the current commit
 * `--tool <NAME>` — Specify diff editor to be used (implies --interactive)
 * `-m`, `--message <MESSAGE>` — The change description to use (don't open editor)
-* `--editor` — Open an editor to edit the change description
+* `-e`, `--editor` — Open an editor to edit the change description
 
    Forces an editor to open when using `--message` to allow the message to be edited afterwards.
 
@@ -943,7 +943,7 @@ Starts an editor to let you edit the description of changes. The editor will be 
 * `--stdin` — Read the change description from stdin
 
    If multiple revisions are specified, the same description will be used for all of them.
-* `--editor` — Open an editor to edit the change description
+* `-e`, `--editor` — Open an editor to edit the change description
 
    Forces an editor to open when using `--stdin` or `--message` to allow the message to be edited afterwards.
 
@@ -3298,7 +3298,7 @@ achieved with `jj new`.
 * `-m`, `--message <MESSAGE>` — The change description to use for the selected changes (don't open editor)
 
    Sets the description for the revision containing the selected changes. The other revision will keep its original description, if any.
-* `--editor` — Open an editor to edit the change description(s)
+* `-e`, `--editor` — Open an editor to edit the change description(s)
 
    Forces an editor to open when using `--message` to allow the message to be edited afterward.
 * `-p`, `--parallel` — Split the revision into two parallel revisions instead of a parent and child
@@ -3343,7 +3343,7 @@ An alternative squashing UI is available via the `-o`, `-A`, and `-B` options. U
 * `-B`, `--insert-before <REVSETS>` [alias: `before`] — (Experimental) The revision(s) to insert the new commit before (can be repeated to create a merge commit)
 * `-m`, `--message <MESSAGE>` — The description to use for squashed revision (don't open editor)
 * `-u`, `--use-destination-message` — Use the description of the destination revision and discard the description(s) of the source revision(s)
-* `--editor` — Open an editor to edit the change description
+* `-e`, `--editor` — Open an editor to edit the change description
 
    Forces an editor to open when using `--message` to allow the message to be edited afterwards.
 * `-i`, `--interactive` — Interactively choose which parts to squash

@@ -79,7 +79,7 @@ pub(crate) struct DescribeArgs {
     ///
     /// Forces an editor to open when using `--stdin` or `--message` to
     /// allow the message to be edited afterwards.
-    #[arg(long)]
+    #[arg(long, short = 'e')]
     editor: bool,
 }
 

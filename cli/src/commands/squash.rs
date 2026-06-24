@@ -156,7 +156,7 @@ pub(crate) struct SquashArgs {
     ///
     /// Forces an editor to open when using `--message` to allow the
     /// message to be edited afterwards.
-    #[arg(long)]
+    #[arg(long, short = 'e')]
     editor: bool,
 
     /// Interactively choose which parts to squash
