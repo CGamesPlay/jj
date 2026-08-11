@@ -473,7 +473,7 @@ fn test_git_push_forward_unexpectedly_moved() {
       bookmark: bookmark1 [move forward from 9b2e76de3920 to 624f94a35f00]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -487,7 +487,7 @@ fn test_git_push_forward_unexpectedly_moved() {
       bookmark: bookmark1 [move forward from 9b2e76de3920 to 624f94a35f00]
     [1m[38;5;3mWarning: [39mThe following references unexpectedly moved on the remote:[0m
       [38;5;2mrefs/heads/bookmark1[39m (reason: stale info)
-    [1m[38;5;6mHint: [0m[39mTry fetching from the remote, then make the bookmark point to where you want it to be, and push again.[39m
+    [1m[38;5;6mHint: [0m[39mTry `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.[39m
     [1m[38;5;1mError: [39mFailed to push some bookmarks[0m
     [EOF]
     [exit status: 1]
@@ -539,7 +539,7 @@ fn test_git_push_sideways_unexpectedly_moved() {
       bookmark: bookmark1 [move sideways from 9b2e76de3920 to 827b8a385853]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -553,7 +553,7 @@ fn test_git_push_sideways_unexpectedly_moved() {
       bookmark: bookmark1 [move sideways from 9b2e76de3920 to 827b8a385853]
     [1m[38;5;3mWarning: [39mThe following references unexpectedly moved on the remote:[0m
       [38;5;2mrefs/heads/bookmark1[39m (reason: stale info)
-    [1m[38;5;6mHint: [0m[39mTry fetching from the remote, then make the bookmark point to where you want it to be, and push again.[39m
+    [1m[38;5;6mHint: [0m[39mTry `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.[39m
     [1m[38;5;1mError: [39mFailed to push some bookmarks[0m
     [EOF]
     [exit status: 1]
@@ -605,7 +605,7 @@ fn test_git_push_deletion_unexpectedly_moved() {
       bookmark: bookmark1 [delete from 9b2e76de3920]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -654,7 +654,7 @@ fn test_git_push_unexpectedly_deleted() {
       bookmark: bookmark1 [move sideways from 9b2e76de3920 to 09919fb051bf]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -680,7 +680,7 @@ fn test_git_push_unexpectedly_deleted() {
       bookmark: bookmark1 [delete from 9b2e76de3920]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -722,7 +722,7 @@ fn test_git_push_creation_unexpectedly_already_exists() {
       bookmark: bookmark1 [add to a43cb8011c85]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -960,7 +960,7 @@ fn test_git_push_multiple() {
       tag: tag2 [add to 0cb91ecd4965]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/bookmark3 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch bookmark3`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -1469,7 +1469,7 @@ fn test_git_push_changes_with_name_untracked_or_forgotten() {
       bookmark: b1 [add to aa9ad64cb4ce]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/b1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch b1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
@@ -1489,7 +1489,7 @@ fn test_git_push_changes_with_name_untracked_or_forgotten() {
       bookmark: b1 [add to 9a0f76645905]
     Warning: The following references unexpectedly moved on the remote:
       refs/heads/b1 (reason: stale info)
-    Hint: Try fetching from the remote, then make the bookmark point to where you want it to be, and push again.
+    Hint: Try `jj git fetch --branch b1`, then make the bookmark point to where you want it to be, and push again.
     Error: Failed to push some bookmarks
     [EOF]
     [exit status: 1]
