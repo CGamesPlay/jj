@@ -521,9 +521,15 @@ pub fn print_push_stats(ui: &Ui, stats: &GitPushStats) -> io::Result<()> {
             writeln!(formatter)?;
         }
         drop(formatter);
+        let fetch_args = stats
+            .rejected
+            .iter()
+            .filter_map(|(reference, _)| reference.as_str().strip_prefix("refs/heads/"))
+            .map(|branch| format!(" --branch {branch}"))
+            .join("");
         writeln!(
             ui.hint_default(),
-            "Try fetching from the remote, then make the bookmark point to where you want it to \
+            "Try `jj git fetch{fetch_args}`, then make the bookmark point to where you want it to \
              be, and push again.",
         )?;
     }
