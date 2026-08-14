@@ -379,13 +379,71 @@ fn test_bug_2600_rootcommit_special_case() {
     [EOF]
     ");
 
-    // Now, the test
+    // Now, the test. Abandoning "base" leaves "b" with parents [root(), a].
+    // Since the root commit is an ancestor of every commit, it is dropped as a
+    // redundant merge parent (the Git backend can't represent it either), so
+    // "b" ends up as a normal child of "a".
     let output = work_dir.run_jj(["abandon", "base"]);
     insta::assert_snapshot!(output, @"
     ------- stderr -------
-    Error: The Git backend does not support creating merge commits with the root commit as one of the parents.
+    Abandoned 1 commits:
+      rlvkpnrz f86102d4 base | base
+    Deleted bookmarks: base
+    Rebased 3 descendant commits onto parents of abandoned commits.
+    Working copy  (@) now at: vruxwmqv 223463b6 c | c
+    Parent commit (@-)      : royxmykx bf7e8352 b | b
+    Added 0 files, modified 0 files, removed 1 files
     [EOF]
-    [exit status: 1]
+    ");
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @  [vru] c
+    ○  [roy] b
+    ○  [zsu] a
+    ◆  [zzz]
+    [EOF]
+    ");
+}
+
+/// Two commits directly on the root commit merged into one; abandoning one of
+/// the merged parents should leave the merge as a plain child of the other
+/// parent, rather than an (unrepresentable) merge with the root commit.
+#[test]
+fn test_abandon_merged_root_child() {
+    let test_env = TestEnvironment::default();
+    test_env.run_jj_in(".", ["git", "init", "repo"]).success();
+    let work_dir = test_env.work_dir("repo");
+
+    create_commit(&work_dir, "a", &[]);
+    create_commit(&work_dir, "b", &[]);
+    create_commit(&work_dir, "c", &["a", "b"]);
+
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @    [roy] c
+    ├─╮
+    │ ○  [zsu] b
+    ○ │  [rlv] a
+    ├─╯
+    ◆  [zzz]
+    [EOF]
+    ");
+
+    let output = work_dir.run_jj(["abandon", "b"]);
+    insta::assert_snapshot!(output, @"
+    ------- stderr -------
+    Abandoned 1 commits:
+      zsuskuln d18ca3e8 b | b
+    Deleted bookmarks: b
+    Rebased 1 descendant commits onto parents of abandoned commits.
+    Working copy  (@) now at: royxmykx e58e927f c | c
+    Parent commit (@-)      : rlvkpnrz 7d980be7 a | a
+    Added 0 files, modified 0 files, removed 1 files
+    [EOF]
+    ");
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @  [roy] c
+    ○  [rlv] a
+    ◆  [zzz]
+    [EOF]
     ");
 }
 

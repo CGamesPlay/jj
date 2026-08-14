@@ -21,6 +21,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed bugs
 
+* Rewriting commits (e.g. `jj abandon` or `jj rebase`) no longer fails with "The
+  Git backend does not support creating merge commits with the root commit as
+  one of the parents" when a merge commit would end up with the root commit as
+  one of several parents. The redundant root commit parent is now dropped, since
+  the root commit is an ancestor of every other commit.
+  [#2600](https://github.com/jj-vcs/jj/issues/2600)
+
 * A side of a conflict whose contents end with a carriage return no longer loses
   that byte when the materialized conflict is parsed back, such as when a
   conflicted file is snapshotted from the working copy.

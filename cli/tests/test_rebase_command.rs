@@ -798,12 +798,22 @@ fn test_rebase_multiple_destinations() {
     [EOF]
     ");
 
+    // Rebasing onto both "b" and the root commit drops the redundant root
+    // parent (the root commit is an ancestor of "b"), so "a" becomes a normal
+    // child of "b" instead of an unrepresentable merge with the root commit.
     let output = work_dir.run_jj(["rebase", "-r", "a", "-o", "b", "-o", "root()"]);
     insta::assert_snapshot!(output, @"
     ------- stderr -------
-    Error: The Git backend does not support creating merge commits with the root commit as one of the parents.
+    Rebased 1 commits to destination.
     [EOF]
-    [exit status: 1]
+    ");
+    insta::assert_snapshot!(get_log_output(&work_dir), @"
+    @  c
+    │ ○  a: b
+    │ ○  b
+    ├─╯
+    ◆
+    [EOF]
     ");
 }
 

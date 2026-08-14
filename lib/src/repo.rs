@@ -1086,8 +1086,20 @@ impl MutableRepo {
     ///
     /// If `parent_mapping` contains cycles, this function may either panic or
     /// drop parents that caused cycles.
+    ///
+    /// If the resulting parents would be a merge with the root commit as one of
+    /// the parents, the root commit is dropped. The root commit is an ancestor
+    /// of every other commit, so it is always redundant as one of multiple
+    /// parents, and backends such as Git cannot represent such a merge anyway.
     pub fn new_parents(&self, old_ids: &[CommitId]) -> Vec<CommitId> {
-        self.rewritten_ids_with(old_ids, |rewrite| !matches!(rewrite, Rewrite::Divergent(_)))
+        let mut new_ids =
+            self.rewritten_ids_with(old_ids, |rewrite| !matches!(rewrite, Rewrite::Divergent(_)));
+        if new_ids.len() > 1 {
+            let root_id = self.store().root_commit_id();
+            new_ids.retain(|id| id != root_id);
+            debug_assert!(!new_ids.is_empty());
+        }
+        new_ids
     }
 
     async fn normalize_heads(&mut self) -> IndexResult<()> {
